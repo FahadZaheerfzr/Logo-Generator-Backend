@@ -18,7 +18,7 @@ class LogoAi:
         """
         response = openai.Image.create(
             prompt=prompt,
-            n=10,
+            n=1,
             size = "256x256",
         )
         image_url = response['data']
