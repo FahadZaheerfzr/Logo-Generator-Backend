@@ -5,11 +5,9 @@ from connection import db
 from logoai import LogoAi
 import requests
 import json
-from PIL import Image
+from PIL import Image,ImageDraw,ImageFont
 from io import BytesIO
-from svglib.svglib import svg2rlg
-from reportlab.graphics import renderPM
-import cairosvg
+
 
 app = FastAPI()
 LogoBot = LogoAi()
@@ -59,10 +57,10 @@ async def logoGeneration(request: Request):
     image_urls = LogoBot.getImageFromPrompt(prompt)
     image_url = image_urls[0]["url"]
     name = prompt
-    print (image_url)
 
     logo_response = requests.get(image_url)
-
+    print(logo_response)
+    # store image as file
     if logo_response.status_code != 200:
         return {"message": "Failed to generate logo"}
 
@@ -89,22 +87,44 @@ async def logoGeneration(request: Request):
     if res.status_code != 200:
         return {"message": "Failed to generate logo"}
     
-    svgPath="logoString.svg"
-    svg_string = res.json()["fonts"][0]['svg']
-    with open(svgPath, 'w') as f:
-        f.write(svg_string)
-    pngPath="logoString.png"
-    drawing = svg2rlg(svgPath)
-    renderPM.drawToFile(drawing, pngPath, fmt="PNG")
-    
+    text = res.json()["fonts"][0]['name']
+    print("fonts/"+text)
+    image = Image.open(BytesIO(logo_response.content))
+    txt_layer = Image.new('RGBA', image.size, (255,255,255,0))
 
-    svg_image = Image.open(pngPath)
+    average_color = get_average_color(image)
+    inverted_color = invert_color(average_color)
+    try:
+        font = ImageFont.truetype("fonts/"+text+".ttf", 62)
+    except:
+        #otherwise must be otf file
+        font = ImageFont.truetype("fonts/"+text+".otf", 62)
 
-    logo_image = Image.open(BytesIO(logo_response.content))
+    d = ImageDraw.Draw(txt_layer)
+    d.text((0,0), name, fill=inverted_color+(255,), font=font)
+    out = Image.alpha_composite(image.convert("RGBA"), txt_layer)
+    out.save('out.png')
 
-    logo_image.paste(svg_image, (0, 0), svg_image)
-    logo_image.save('logo.png')
 
-    resImage64= logo_image.tobytes().decode('base64')
 
-    return {"message": "Logo generated successfully", "image": image_urls, "newImage": resImage64}
+    return {"message": "Logo generated successfully", "image": image_urls, "newImage": "none"}
+
+
+
+def get_average_color(image):
+    # Calculate the average color of the image
+    colors = image.getdata()
+    r, g, b = 0, 0, 0
+    count = 0
+
+    for color in colors:
+        r += color[0]
+        g += color[1]
+        b += color[2]
+        count += 1
+
+    return (r // count, g // count, b // count)
+
+def invert_color(color):
+    r, g, b = color
+    return (255 - r, 255 - g, 255 - b)
