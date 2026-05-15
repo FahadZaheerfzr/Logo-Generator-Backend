@@ -1,6 +1,4 @@
 .venv/
 __pycache__
 components/__pycache__
-temp_auto_push.bat
-temp_interactive_push.bat
 .gitignore
